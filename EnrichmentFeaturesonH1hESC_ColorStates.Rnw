@@ -1,0 +1,202 @@
+\documentclass{article}
+\usepackage{graphicx, verbatim}
+\setlength{\textwidth}{6.5in} 
+\setlength{\textheight}{9in}
+\setlength{\oddsidemargin}{0in} 
+\setlength{\evensidemargin}{0in}
+\setlength{\topmargin}{-1.5cm}
+
+
+\begin{document}
+\title{Analyze the Genomic Features Enrichment}
+\author{Ricky Lim}
+\date{06 March 2013}
+\maketitle
+
+\section{Goals}
+
+\begin{itemize}
+
+  \item To analyze the enrichment of each genomic feature in each color chromatin state in h1hESC
+  \item Genomic features analyzed include 
+  
+  \begin{itemize}
+    \item CpG islands
+    \item RefSeqExon
+    \item RefSeqGene
+    \item LaminB1lads
+    \item Open Chromatin
+    \item TSS
+    \item Expressed TSS
+    \item NonExpressed TSS
+  \end{itemize}
+  \item All the data were publicly available from ENCODE
+
+\end{itemize}
+
+\section{Set Working Directory}
+\begin{verbatim}
+  #PWD
+  /TEMP_DDN/users/gfilion/rlim/Desktop/Projects/CHIPdatasets/HumanAlignmentData/
+  fasq-cells:H1-hESC/Ranalysis/EnrichmentFeaturesOnChromatinColor
+\end{verbatim}
+<<echo=FALSE>>=
+setwd("/TEMP_DDN/users/gfilion/rlim/Desktop/Projects/CHIPdatasets/HumanAlignmentData/fasq-cells:H1-hESC/Ranalysis/EnrichmentFeaturesOnChromatinColor")
+@
+
+\section{Get Datasets}
+\subsection{Methods applied to these Datasets}
+
+\begin{itemize}
+  \item The genomic features datasets were obtained from chromHMM package in COORDS/hg19. 
+  \item These genomic features were then overlapped with the states\_dom\_hESC.txt.gz (color states of h1hESC, constructed by GF) using bedTools (intersectBed).
+  
+    \begin{verbatim}
+    #pwd of states_dom_hESC.txt.gz
+    /users/gfilion/gfilion/People/RickyLim/TAD_overlap/data
+    \end{verbatim}
+    
+  \item The overlapping was done using pipeline script 
+    \begin{verbatim}
+     #pwd:/users/gfilion/rlim/HumanAlignmentData/
+     fasq-cells:H1-hESC/Ranalysis/EnrichmentFeaturesOnChromatinColor/data
+     ./getBedIntersect.sh 
+     #run as follows:
+     ./getBedIntersect.sh -a EnrichmentFeatures/NoHeaderStates_dom_hESC.txt.bed 
+     -b hg19_COORDS/ -s .h1Color.bed -o EnrichmentFeatures/ &
+    \end{verbatim}
+  
+  \item These overlapped files, each with each genomic features were stored in /EnrichmentFeatures
+\end{itemize}
+
+\subsection{Datasets Loaded, here we go}
+<<Datasets>>=
+CpG <- read.delim("data/EnrichmentFeatures/CpGIsland.h1Color.bed", header=FALSE)
+Exon <- read.delim("data/EnrichmentFeatures/RefSeqExon.h1Color.bed", header=FALSE)
+Gene <- read.delim("data/EnrichmentFeatures/RefSeqGene.h1Color.bed", header=FALSE)
+OpenChromatin <- read.delim("data/EnrichmentFeatures/ValidateOpenChromatin.h1color.bed", header=FALSE)
+rnaSeqExpressedGene <- read.delim("data/EnrichmentFeatures/RNAseqTSSH1ExpressedGene.h1color.bed", header=FALSE)
+rnaSeqNonExpressedGene <- read.delim("data/EnrichmentFeatures/RNAseqTSSH1NonExpressedGene.h1color.bed", header=FALSE)
+rnaTSS <- read.delim("data/EnrichmentFeatures/RNAseqTSSAllH1.h1color.bed", header=FALSE)
+laminB1 <- read.delim("data/EnrichmentFeatures/laminB1lads.h1Color.bed", header=FALSE)
+@
+
+\section{Analyze the Enrichment}
+The enrichment of each genomic feature in each color is computed as the percentage of coverage
+
+<<getCoverage, cache=TRUE>>=
+
+getCoverageGenomicFeature <- function(x){
+  coverage <- tapply(INDEX=x$V4, X=x$V3-x$V2, sum)
+  percentage <- coverage/sum(coverage)
+  return(percentage)
+}
+
+EnrichCpG <- getCoverageGenomicFeature(CpG)
+EnrichExon <- getCoverageGenomicFeature(Exon)
+EnrichGene <- getCoverageGenomicFeature(Gene)
+EnrichLamin <- getCoverageGenomicFeature(laminB1)
+EnrichOpenChromatin <- getCoverageGenomicFeature(OpenChromatin)
+EnrichRNANonExpressed <- getCoverageGenomicFeature(rnaSeqNonExpressedGene)
+EnrichRNAExpressed <- getCoverageGenomicFeature(rnaSeqExpressedGene)
+EnrichRNATSS <- getCoverageGenomicFeature(rnaTSS)
+@
+
+\subsection{Plot the Coverage}
+<<PlotCoverage, cache=TRUE>>=
+pdf("figs/FeatureCoverageH1.pdf", height=6, width=6)
+par(mfrow=c(2,4))
+color_states =c("black", "deeppink2", "purple4", "red", "gold2")
+pie(EnrichCpG, col=color_states, main="CpG", labels="")
+pie(EnrichExon, col=color_states, main="Exon", labels="" )
+pie(EnrichGene, col=color_states, main="Gene", labels="")
+pie(EnrichLamin, col=color_states, main="LaminB1", labels="")
+pie(EnrichOpenChromatin, col=color_states, main="Open Chromatin", labels="")
+pie(EnrichRNATSS, col=color_states, main="TSS", labels="")
+pie(EnrichRNAExpressed, col=color_states, main="ExpressedTSS", labels="")
+pie(EnrichRNANonExpressed, col=color_states, main="NonExpressedTSS", labels="")
+dev.off()
+@
+\includegraphics[width=1\textwidth]{figs/FeatureCoverageH1.pdf}
+
+\subsection{Plot 3D}
+<<>>=
+library(plotrix)
+pdf("figs/3DFeatureCoverageH1.pdf", height=6, width=6)
+par(mfrow=c(2,4))
+color_states =c("black", "deeppink2", "purple4", "red", "gold2")
+pie3D(EnrichCpG, col=color_states, main="CpG", labels="",explode=0.1)
+pie3D(EnrichExon, col=color_states, main="Exon", labels="",explode=0.1)
+pie3D(EnrichGene, col=color_states, main="Gene", labels="",explode=0.1)
+pie3D(EnrichLamin, col=color_states, main="Lamin B1", labels="",explode=0.1)
+pie3D(EnrichOpenChromatin, col=color_states, main="Open Chromatin", labels="",explode=0.1)
+pie3D(EnrichRNATSS, col=color_states, main="TSS", labels="",explode=0.1)
+pie3D(EnrichRNAExpressed, col=color_states, main="Expressed TSS", labels="",explode=0.1)
+pie3D(EnrichRNANonExpressed, col=color_states, main="NonExpressed TSS", labels="",explode=0.1)
+dev.off()
+
+@
+
+\includegraphics[width=1\textwidth]{figs/3DFeatureCoverageH1.pdf}
+
+\subsection{Combined Pie Charts into a Bar Plot}
+<<>>=
+library(ggplot2)
+library(reshape)
+H1_allGenomicFeatures <- data.frame(
+  CpG = EnrichCpG,
+  Exon = EnrichExon,
+  Gene = EnrichGene,
+  Lamin = EnrichLamin,
+  Open_Chromatin = EnrichOpenChromatin,
+  TSS = EnrichRNATSS,
+  TSS_NonExpressed = EnrichRNANonExpressed,
+  TSS_Expressed = EnrichRNAExpressed
+)
+
+head(H1_allGenomicFeatures)
+H1_allGenomicFeatures$category <- row.names(H1_allGenomicFeatures)
+mH1_allGenomicFeatures <- melt(H1_allGenomicFeatures, id.vars="category")
+
+
+# attempt to reorganize the order of color states
+
+#head(mH1_allGenomicFeatures)
+#myfunkyvector = c(1,3,5,2,4) + 5*rep(0:7, each=5)
+#mH1_allGenomicFeatures[myfunkyvector,]
+#mH1_allGenomicFeatures <- mH1_allGenomicFeatures[myfunkyvector,]
+#rownames(mH1_allGenomicFeatures) <- NULL
+#head(mH1_allGenomicFeatures)
+
+# reorganize the order of color states
+mH1_allGenomicFeatures$category <- factor(mH1_allGenomicFeatures$category, 
+                                          levels= c("black", "purple", "yellow", "pink", "red"))
+
+pdf("figs/ALLFeatureCoverageH1.pdf", height=6, width=6)
+p <- ggplot(mH1_allGenomicFeatures, aes(variable, value, fill = factor(category)))+
+     geom_bar(position="fill") +
+     coord_flip() +
+     scale_fill_manual(name = "Color States", values=c("black", "purple", "yellow", "pink", "red")) +
+     xlab('Features') +
+     ylab('Coverage')
+     
+p
+dev.off()
+
+@
+
+\includegraphics[width=1\textwidth]{figs/ALLFeatureCoverageH1.pdf}
+
+\subsection{MetaInfo}
+\begin{itemize}\raggedright
+  \item R version 2.15.0 (2012-03-30), \verb|x86_64-unknown-linux-gnu|
+  \item Locale: \verb|LC_CTYPE=en_US.UTF-8|, \verb|LC_NUMERIC=C|, \verb|LC_TIME=en_US.UTF-8|, \verb|LC_COLLATE=en_US.UTF-8|, \verb|LC_MONETARY=en_US.UTF-8|, \verb|LC_MESSAGES=en_US.UTF-8|, \verb|LC_PAPER=C|, \verb|LC_NAME=C|, \verb|LC_ADDRESS=C|, \verb|LC_TELEPHONE=C|, \verb|LC_MEASUREMENT=en_US.UTF-8|, \verb|LC_IDENTIFICATION=C|
+  \item Base packages: base, datasets, graphics, grDevices, methods, stats, utils
+  \item Other packages: Biobase~2.16.0, BiocGenerics~0.2.0, cacheSweave~0.6-1, filehash~2.2-1, GEOquery~2.23.5,
+    ggplot2~0.9.3, plotrix~3.4-1, plyr~1.7.1, reshape~0.8.4, stashR~0.3-5
+  \item Loaded via a namespace (and not attached): colorspace~1.1-1, dichromat~1.2-4, digest~0.5.2, grid~2.15.0,
+    gtable~0.1.2, labeling~0.1, MASS~7.3-17, munsell~0.3, proto~0.3-9.2, RColorBrewer~1.0-5, RCurl~1.91-1,
+    reshape2~1.2.1, scales~0.2.3, stringr~0.6, tools~2.15.0, XML~3.9-4
+\end{itemize}
+
+\end{document}
